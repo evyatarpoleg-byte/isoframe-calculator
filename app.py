@@ -4,105 +4,117 @@ import numpy as np
 
 st.set_page_config(page_title="ISOframe Calculator", layout="wide")
 
-def draw_layout(shape, dims, panel_w, radius):
-    fig, ax = plt.subplots(figsize=(10, 6))
+def draw_layout(shape, dims, panel_w, radius, gap=0.1):
+    fig, ax = plt.subplots(figsize=(10, 7))
     
-    # Standard 90-degree arc length (Quarter circle)
-    # L = (pi * R) / 2
+    # ISOframe Math: Quarter circle arc length
     arc_len = (np.pi * radius) / 2
     
-    x_coords = []
-    y_coords = []
+    # Coordinates for the Booth Wall (Grey) and System (Green)
+    wall_x, wall_y = [], []
+    sys_x, sys_y = [], []
 
     if shape == "S - Straight":
-        length = dims[0]
-        x_coords = [0, length]
-        y_coords = [0, 0]
-        total_len = length
+        l = dims[0]
+        # Wall
+        wall_x = [0, l]
+        wall_y = [gap, gap]
+        # System
+        sys_x = [0, l]
+        sys_y = [0, 0]
+        total_len = l
         
     elif shape == "L - Shaped":
-        side_a, side_b = dims
-        # 1. Horizontal line from left to corner start
-        x_coords.extend([0, side_a - radius])
-        y_coords.extend([0, 0])
-        # 2. Smooth 90 deg corner (center is at side_a-radius, -radius)
-        t = np.linspace(np.pi/2, 0, 20)
-        x_coords.extend((side_a - radius) + radius * np.cos(t))
-        y_coords.extend((-radius) + radius * np.sin(t))
-        # 3. Vertical line down to end
-        x_coords.append(side_a)
-        y_coords.append(-(side_b - radius + radius)) # Total depth is side_b
+        w, d = dims
+        # Wall (Sharp corner)
+        wall_x = [0, w, w]
+        wall_y = [0, 0, -d]
         
-        total_len = (side_a - radius) + arc_len + (side_b - radius)
+        # System (Offset by gap)
+        # 1. Horizontal
+        sys_x.extend([0, w - radius - gap])
+        sys_y.extend([-gap, -gap])
+        # 2. Corner (Center is at w-radius-gap, -radius-gap)
+        t = np.linspace(np.pi/2, 0, 20)
+        sys_x.extend((w - radius - gap) + radius * np.cos(t))
+        sys_y.extend((-radius - gap) + radius * np.sin(t))
+        # 3. Vertical
+        sys_x.append(w - gap)
+        sys_y.append(-d)
+        
+        total_len = (w - radius - gap) + arc_len + (d - radius - gap)
 
     elif shape == "U - Shaped":
         side_a, back, side_c = dims
-        # 1. Left side (Vertical) - start at top left
-        x_coords.append(0)
-        y_coords.append(side_a)
-        x_coords.append(0)
-        y_coords.append(radius)
-        # 2. Bottom-left corner (center at R, R)
-        t = np.linspace(np.pi, 1.5 * np.pi, 20)
-        x_coords.extend(radius + radius * np.cos(t))
-        y_coords.extend(radius + radius * np.sin(t))
-        # 3. Back wall (Horizontal)
-        x_coords.append(back - radius)
-        y_coords.append(0)
-        # 4. Bottom-right corner (center at back-R, R)
-        t = np.linspace(1.5 * np.pi, 2 * np.pi, 20)
-        x_coords.extend((back - radius) + radius * np.cos(t))
-        y_coords.extend(radius + radius * np.sin(t))
-        # 5. Right side (Vertical)
-        x_coords.append(back)
-        y_coords.append(side_c)
+        # Wall (Sharp corners)
+        wall_x = [0, 0, back, back]
+        wall_y = [side_a, 0, 0, side_c]
         
-        total_len = (side_a - radius) + arc_len + (back - 2*radius) + arc_len + (side_c - radius)
+        # System (Offset inward by gap)
+        # 1. Left Vertical
+        sys_x.extend([gap, gap])
+        sys_y.extend([side_a, radius + gap])
+        # 2. Bottom Left Corner (Center at R+gap, R+gap)
+        t = np.linspace(np.pi, 1.5 * np.pi, 20)
+        sys_x.extend((radius + gap) + radius * np.cos(t))
+        sys_y.extend((radius + gap) + radius * np.sin(t))
+        # 3. Horizontal Back
+        sys_x.append(back - radius - gap)
+        sys_y.append(gap)
+        # 4. Bottom Right Corner (Center at back-R-gap, R+gap)
+        t = np.linspace(1.5 * np.pi, 2 * np.pi, 20)
+        sys_x.extend((back - radius - gap) + radius * np.cos(t))
+        sys_y.extend((radius + gap) + radius * np.sin(t))
+        # 5. Right Vertical
+        sys_x.append(back - gap)
+        sys_y.append(side_c)
+        
+        total_len = (side_a - radius - gap) + arc_len + (back - 2*(radius + gap)) + arc_len + (side_c - radius - gap)
 
-    # Plotting the wall
-    ax.plot(x_coords, y_coords, color='#2e7d32', linewidth=6, solid_capstyle='round')
+    # Plot Wall
+    ax.plot(wall_x, wall_y, color='#BDBDBD', linewidth=3, label="Booth Back Wall", linestyle='--')
+    # Plot System
+    ax.plot(sys_x, sys_y, color='#2e7d32', linewidth=6, solid_capstyle='round', label="ISOframe Wave")
     
-    # Adding some style
+    # Legend and Styling
     ax.set_aspect('equal')
     ax.axis('off')
-    
-    # Add a floor grid for scale (optional)
-    ax.grid(True, linestyle='--', alpha=0.3)
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05), ncol=2, frameon=False)
     
     return fig, total_len
 
 st.title("📏 ISOframe Wave Calculator")
-st.write("Calculate how many 800mm panels you need for your booth layout.")
+st.write("Determine the number of 800mm panels required, accounting for a 10cm wall clearance.")
 
 col1, col2 = st.columns([1, 2])
 
 with col1:
     shape = st.selectbox("Wall Shape", ["S - Straight", "L - Shaped", "U - Shaped"])
-    panel_w = 0.8 # 800mm
-    # To use 2 panels for a 90 degree curve, the radius must be approx 1.02m
-    radius = 1.02 
+    panel_w = 0.8
+    radius = 1.02 # Safe 2-panel curve radius
+    gap = 0.1    # 10cm distance from wall
     
     if shape == "S - Straight":
-        l = st.number_input("Wall Length (m)", min_value=0.8, value=8.0, step=0.1)
+        l = st.number_input("Booth Wall Length (m)", min_value=0.8, value=8.0, step=0.1)
         dims = [l]
     elif shape == "L - Shaped":
-        w = st.number_input("Side A (Width) (m)", min_value=1.5, value=4.0, step=0.1)
-        d = st.number_input("Side B (Depth) (m)", min_value=1.5, value=2.5, step=0.1)
+        w = st.number_input("Wall Side A (Width) (m)", min_value=1.5, value=4.0, step=0.1)
+        d = st.number_input("Wall Side B (Depth) (m)", min_value=1.5, value=2.5, step=0.1)
         dims = [w, d]
     else:
-        a = st.number_input("Left Side Depth (m)", min_value=1.5, value=2.0, step=0.1)
-        b = st.number_input("Back Wall Width (m)", min_value=3.0, value=4.0, step=0.1)
-        c = st.number_input("Right Side Depth (m)", min_value=1.5, value=2.0, step=0.1)
+        a = st.number_input("Wall Left Depth (m)", min_value=1.5, value=2.0, step=0.1)
+        b = st.number_input("Wall Back Width (m)", min_value=3.0, value=4.0, step=0.1)
+        c = st.number_input("Wall Right Depth (m)", min_value=1.5, value=2.0, step=0.1)
         dims = [a, b, c]
 
-    fig, total_len = draw_layout(shape, dims, panel_w, radius)
+    fig, total_len = draw_layout(shape, dims, panel_w, radius, gap)
     panels = np.ceil(total_len / panel_w)
     
     st.divider()
-    st.metric("Panels Needed", int(panels))
-    st.write(f"**Total Wall Path:** {total_len:.2f}m")
-    st.caption(f"Calculation uses a {radius}m radius for corners (2 panels per corner).")
+    st.metric("ISOframe Panels Needed", int(panels))
+    st.write(f"**Total Path Length:** {total_len:.2f}m")
+    st.info(f"System is calculated with a {int(gap*100)}cm gap from the booth wall.")
 
 with col2:
-    st.write("### Layout Preview (Top Down)")
+    st.write("### Top-Down Layout Preview")
     st.pyplot(fig)
